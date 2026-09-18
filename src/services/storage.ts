@@ -5,7 +5,9 @@ export type AIProvider = 'Gemini' | 'Claude' | 'Perplexity' | 'OpenAI';
 export interface UserPreferences {
   selectedInterests: string[];
   aiProvider: AIProvider | null;
+  geminiApiKey?: string;
   whatsappNumber: string | null;
+  autoDeliverWhatsApp?: boolean;
   digestTime: string; // HH:mm format
   isOnboarded: boolean;
 }
@@ -32,9 +34,11 @@ export const StorageService = {
     const data = await AsyncStorage.getItem(PREFS_KEY);
     if (!data) {
       return {
-        selectedInterests: ['AI trends in software engineering', 'Latest AI news & papers', 'Mobile & React Native dev'],
+        selectedInterests: ['AI trends in travel industry', 'AI trends in banking industry', 'AI trends in e-commerce', 'AI in software'],
         aiProvider: 'Gemini',
+        geminiApiKey: '',
         whatsappNumber: null,
+        autoDeliverWhatsApp: true,
         digestTime: '07:00',
         isOnboarded: true,
       };

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppContext } from '../store/AppContext';
 import { theme } from '../theme/theme';
 import { AgentService, AI_PROVIDERS } from '../services/agent';
-import { CheckCircle2, ChevronRight, MessageCircle } from 'lucide-react-native';
+import { CheckCircle2, ChevronRight, MessageCircle, Sparkles } from 'lucide-react-native';
 
 const INTERESTS = [
   'AI trends in travel industry',
@@ -19,9 +19,14 @@ const INTERESTS = [
 export default function OnboardingScreen() {
   const { updatePreferences } = useAppContext();
   const [step, setStep] = useState(1);
-  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([
+    'AI trends in travel industry',
+    'AI trends in banking industry',
+    'AI trends in e-commerce',
+    'AI in software'
+  ]);
   const [availableProviders, setAvailableProviders] = useState<string[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<string>('Gemini');
   const [whatsapp, setWhatsapp] = useState('');
 
   useEffect(() => {
@@ -31,17 +36,17 @@ export default function OnboardingScreen() {
   const toggleInterest = (interest: string) => {
     setSelectedInterests(prev => {
       if (prev.includes(interest)) return prev.filter(i => i !== interest);
-      if (prev.length < 4) return [...prev, interest];
-      return prev;
+      return [...prev, interest];
     });
   };
 
   const handleComplete = async () => {
-    if (selectedInterests.length === 4 && selectedProvider && whatsapp) {
+    if (selectedInterests.length > 0 && selectedProvider) {
       await updatePreferences({
         selectedInterests,
         aiProvider: selectedProvider as any,
         whatsappNumber: whatsapp,
+        autoDeliverWhatsApp: true,
         isOnboarded: true
       });
     }
@@ -49,8 +54,8 @@ export default function OnboardingScreen() {
 
   const renderStepOne = () => (
     <Animated.View style={styles.stepContainer}>
-      <Text style={styles.title}>Curate your Digest</Text>
-      <Text style={styles.subtitle}>Select exactly 4 topics you want to keep up with every morning.</Text>
+      <Text style={styles.title}>Select Research Topics</Text>
+      <Text style={styles.subtitle}>Choose topics for your daily AI research summary:</Text>
       
       <View style={styles.list}>
         {INTERESTS.map(interest => {
@@ -63,29 +68,29 @@ export default function OnboardingScreen() {
               activeOpacity={0.7}
             >
               <Text style={[styles.cardText, isSelected && styles.cardTextSelected]}>{interest}</Text>
-              {isSelected && <CheckCircle2 color={theme.colors.success} size={20} />}
+              {isSelected && <CheckCircle2 color={theme.colors.success} size={18} />}
             </TouchableOpacity>
-          )
+          );
         })}
       </View>
 
       <TouchableOpacity 
-        style={[styles.button, selectedInterests.length !== 4 && styles.buttonDisabled]} 
-        disabled={selectedInterests.length !== 4}
+        style={[styles.button, selectedInterests.length === 0 && styles.buttonDisabled]} 
+        disabled={selectedInterests.length === 0}
         onPress={() => setStep(2)}
       >
-        <Text style={styles.buttonText}>Continue ({selectedInterests.length}/4)</Text>
+        <Text style={styles.buttonText}>Continue ({selectedInterests.length} selected)</Text>
       </TouchableOpacity>
     </Animated.View>
   );
 
   const renderStepTwo = () => (
     <Animated.View style={styles.stepContainer}>
-      <Text style={styles.title}>Choose your Agent</Text>
-      <Text style={styles.subtitle}>Select the AI provider on your device to research your digest.</Text>
+      <Text style={styles.title}>Select AI Agent</Text>
+      <Text style={styles.subtitle}>Choose your primary AI intelligence model:</Text>
       
       <View style={styles.list}>
-        {AI_PROVIDERS.filter(p => availableProviders.includes(p.id)).map(provider => {
+        {AI_PROVIDERS.map(provider => {
           const isSelected = selectedProvider === provider.id;
           return (
             <TouchableOpacity 
@@ -94,10 +99,13 @@ export default function OnboardingScreen() {
               onPress={() => setSelectedProvider(provider.id)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.cardText, isSelected && styles.cardTextSelected]}>{provider.name}</Text>
-              {isSelected && <CheckCircle2 color={theme.colors.success} size={20} />}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Sparkles color={isSelected ? theme.colors.primaryLight : theme.colors.textSecondary} size={18} />
+                <Text style={[styles.cardText, isSelected && styles.cardTextSelected]}>{provider.name}</Text>
+              </View>
+              {isSelected && <CheckCircle2 color={theme.colors.success} size={18} />}
             </TouchableOpacity>
-          )
+          );
         })}
       </View>
 
@@ -106,39 +114,38 @@ export default function OnboardingScreen() {
         disabled={!selectedProvider}
         onPress={() => setStep(3)}
       >
-        <Text style={styles.buttonText}>Connect Agent <ChevronRight color="#fff" size={20} /></Text>
+        <Text style={styles.buttonText}>Set Delivery Target <ChevronRight color="#fff" size={18} /></Text>
       </TouchableOpacity>
     </Animated.View>
   );
 
   const renderStepThree = () => (
     <Animated.View style={styles.stepContainer}>
-      <MessageCircle color={theme.colors.whatsapp} size={48} style={{ marginBottom: 16 }} />
-      <Text style={styles.title}>Where to deliver?</Text>
-      <Text style={styles.subtitle}>Enter your WhatsApp number. Your digest will be generated locally and passed to WhatsApp.</Text>
+      <MessageCircle color={theme.colors.whatsapp} size={40} style={{ marginBottom: 12 }} />
+      <Text style={styles.title}>WhatsApp Delivery Target</Text>
+      <Text style={styles.subtitle}>Enter your mobile phone number with country code for direct WhatsApp delivery:</Text>
       
       <TextInput
         style={styles.input}
-        placeholder="+1 234 567 8900"
-        placeholderTextColor={theme.colors.textSecondary}
+        placeholder="+91 98765 43210 (or leave empty)"
+        placeholderTextColor="#64748B"
         keyboardType="phone-pad"
         value={whatsapp}
         onChangeText={setWhatsapp}
       />
 
       <TouchableOpacity 
-        style={[styles.button, !whatsapp && styles.buttonDisabled]} 
-        disabled={!whatsapp}
+        style={styles.button} 
         onPress={handleComplete}
       >
-        <Text style={styles.buttonText}>Finish Setup</Text>
+        <Text style={styles.buttonText}>Complete Setup & Launch</Text>
       </TouchableOpacity>
     </Animated.View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.progress}>
           <View style={[styles.dot, step >= 1 && styles.activeDot]} />
           <View style={[styles.dot, step >= 2 && styles.activeDot]} />
@@ -153,21 +160,21 @@ export default function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  scroll: { padding: theme.spacing.xl, flexGrow: 1 },
-  progress: { flexDirection: 'row', justifyContent: 'center', marginBottom: theme.spacing.xl, gap: 8 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.colors.surfaceLight },
+  container: { flex: 1, backgroundColor: '#090D16' },
+  scroll: { padding: theme.spacing.lg, flexGrow: 1 },
+  progress: { flexDirection: 'row', justifyContent: 'center', marginBottom: theme.spacing.lg, gap: 6 },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#1E293B' },
   activeDot: { backgroundColor: theme.colors.primary, width: 24 },
   stepContainer: { flex: 1 },
-  title: { ...theme.typography.h1, marginBottom: theme.spacing.sm },
-  subtitle: { ...theme.typography.body, marginBottom: theme.spacing.xl },
-  list: { gap: theme.spacing.md, marginBottom: theme.spacing.xl },
-  card: { padding: theme.spacing.lg, backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.lg, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border },
-  cardSelected: { borderColor: theme.colors.primary, backgroundColor: theme.colors.surfaceLight },
-  cardText: { ...theme.typography.bodyMedium },
-  cardTextSelected: { color: theme.colors.primaryLight },
-  input: { backgroundColor: theme.colors.surface, padding: theme.spacing.lg, borderRadius: theme.borderRadius.lg, ...theme.typography.bodyMedium, marginBottom: theme.spacing.xl, borderWidth: 1, borderColor: theme.colors.border },
-  button: { backgroundColor: theme.colors.primary, padding: theme.spacing.lg, borderRadius: theme.borderRadius.xl, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 'auto' },
-  buttonDisabled: { backgroundColor: theme.colors.surfaceLight, opacity: 0.5 },
-  buttonText: { ...theme.typography.h3, textAlign: 'center' }
+  title: { fontSize: 22, fontWeight: '800', color: '#F8FAFC', marginBottom: 4 },
+  subtitle: { fontSize: 13, color: theme.colors.textSecondary, marginBottom: theme.spacing.lg },
+  list: { gap: 10, marginBottom: theme.spacing.lg },
+  card: { padding: theme.spacing.md, backgroundColor: '#131C2E', borderRadius: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#22324D' },
+  cardSelected: { borderColor: theme.colors.primary, backgroundColor: `${theme.colors.primary}20` },
+  cardText: { fontSize: 14, color: theme.colors.textSecondary, fontWeight: '500' },
+  cardTextSelected: { color: '#F8FAFC', fontWeight: '700' },
+  input: { backgroundColor: '#131C2E', padding: theme.spacing.md, borderRadius: 12, fontSize: 14, color: '#F8FAFC', marginBottom: theme.spacing.lg, borderWidth: 1, borderColor: '#22324D' },
+  button: { backgroundColor: theme.colors.primary, padding: theme.spacing.md, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 'auto' },
+  buttonDisabled: { backgroundColor: '#1E293B', opacity: 0.5 },
+  buttonText: { fontSize: 15, fontWeight: '700', color: '#fff' }
 });

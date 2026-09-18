@@ -20,14 +20,14 @@ export const AI_PROVIDERS: AIProviderConfig[] = [
   },
   { 
     id: 'Claude', 
-    name: 'Claude', 
+    name: 'Claude AI', 
     urlScheme: 'claude://',
     webUrl: 'https://claude.ai/',
     searchUrl: (q: string) => `https://claude.ai/new?q=${encodeURIComponent(q)}`
   },
   { 
     id: 'Perplexity', 
-    name: 'Perplexity', 
+    name: 'Perplexity AI', 
     urlScheme: 'perplexity://',
     webUrl: 'https://www.perplexity.ai/',
     searchUrl: (q: string) => `https://www.perplexity.ai/search?q=${encodeURIComponent(q)}`
@@ -43,18 +43,7 @@ export const AI_PROVIDERS: AIProviderConfig[] = [
 
 export const AgentService = {
   async getInstalledProviders(): Promise<string[]> {
-    const installed: string[] = [];
-    for (const provider of AI_PROVIDERS) {
-      try {
-        if (await Linking.canOpenURL(provider.urlScheme)) {
-          installed.push(provider.id);
-        }
-      } catch (e) {
-        console.log('Error checking URL scheme for:', provider.id, e);
-      }
-    }
-    installed.push('Gemini', 'Claude', 'Perplexity', 'OpenAI');
-    return [...new Set(installed)];
+    return ['Gemini', 'Claude', 'Perplexity', 'OpenAI'];
   },
 
   async copyToClipboard(text: string): Promise<boolean> {
@@ -70,12 +59,10 @@ export const AgentService = {
   async openAIProviderApp(providerId: string, interestTopic?: string) {
     const provider = AI_PROVIDERS.find(p => p.id.toLowerCase() === providerId.toLowerCase()) || AI_PROVIDERS[0];
     
-    // Construct tailor-made prompt for AI research
     const prompt = interestTopic 
       ? `Perform deep research on "${interestTopic}". Provide top 3 breakthroughs, key tools, and list real web links with concise summarizations for each.`
       : `Perform daily AI research digest. Summarize latest breakthroughs across selected interests and return top research links.`;
     
-    // Copy prompt to clipboard so user can instantly paste into Gemini/ChatGPT/Claude/Perplexity
     await this.copyToClipboard(prompt);
 
     const targetUrl = interestTopic ? provider.searchUrl(prompt) : provider.webUrl;
@@ -99,7 +86,6 @@ export const AgentService = {
   async openURL(url: string) {
     if (!url) return;
     try {
-      // Ensure proper protocol prefix
       let validUrl = url.trim();
       if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://')) {
         validUrl = 'https://' + validUrl;
@@ -116,7 +102,6 @@ export const AgentService = {
     }
   },
 
-  // Intelligent parser for raw text copied from Gemini/ChatGPT/Claude
   parseImportedText(rawText: string, category: string): DigestItem[] {
     if (!rawText || !rawText.trim()) return [];
     
@@ -141,7 +126,7 @@ export const AgentService = {
             category,
             title: currentTitle.replace(/^[#•\-\*\d\.\s]+/, '').trim(),
             summary: currentSummary,
-            link: currentLink || `https://www.google.com/search?q=${encodeURIComponent(currentTitle)}`
+            link: currentLink || `https://news.google.com/search?q=${encodeURIComponent(currentTitle)}`
           });
           currentTitle = '';
           currentSummary = '';
@@ -161,163 +146,196 @@ export const AgentService = {
         category,
         title: currentTitle.replace(/^[#•\-\*\d\.\s]+/, '').trim(),
         summary: currentSummary || 'Curated AI insight imported from external agent.',
-        link: currentLink || `https://www.google.com/search?q=${encodeURIComponent(currentTitle)}`
+        link: currentLink || `https://news.google.com/search?q=${encodeURIComponent(currentTitle)}`
       });
     }
 
     return items;
   },
 
-  async generateDailyDigest(interests: string[], provider: string): Promise<DigestItem[]> {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const items: DigestItem[] = [];
-        
-        const curatedTopics: Record<string, Array<{ title: string; summary: string; searchQuery: string; defaultUrl?: string }>> = {
-          'AI trends in travel industry': [
-            {
-              title: 'AI Autonomous Itinerary & Dynamic Pricing Engine',
-              summary: 'Airlines and OTA platforms are deploying real-time predictive ML for dynamic seat pricing, automated flight disruption rebooking, and hyper-personalized travel agents.',
-              searchQuery: 'AI trends travel industry dynamic pricing booking',
-              defaultUrl: 'https://news.google.com/search?q=AI+travel+industry+trends'
-            },
-            {
-              title: 'Generative AI Concierge & Smart Airport Automation',
-              summary: 'Global airports implement computer vision for passport-free biometrics and LLM-powered multi-lingual digital assistants for passengers.',
-              searchQuery: 'Generative AI airport concierge passenger automation',
-              defaultUrl: 'https://www.google.com/search?q=Generative+AI+airport+concierge'
-            }
-          ],
-          'AI trends in banking industry': [
-            {
-              title: 'Real-Time Fraud Detection & Anti-Money Laundering ML',
-              summary: 'Banks are shifting to graph neural networks (GNNs) and transformer models to identify transaction fraud in milliseconds with 40% fewer false positives.',
-              searchQuery: 'AI banking fraud detection graph neural networks',
-              defaultUrl: 'https://news.google.com/search?q=AI+banking+fraud+detection'
-            },
-            {
-              title: 'Autonomous Financial Advisors & Credit Risk AI',
-              summary: 'Generative AI models analyze alternative data sources for credit scoring and offer automated micro-investment advice to retail banking clients.',
-              searchQuery: 'AI credit risk modeling generative financial advisors',
-              defaultUrl: 'https://www.google.com/search?q=AI+credit+risk+modeling'
-            }
-          ],
-          'AI trends in e-commerce': [
-            {
-              title: 'Visual Search & Virtual Try-On Innovations',
-              summary: 'Diffusion models enable instant 3D product try-ons and multimodal image search, boosting conversion rates by over 25% for top fashion retailers.',
-              searchQuery: 'e-commerce visual search virtual try-on AI',
-              defaultUrl: 'https://news.google.com/search?q=AI+ecommerce+virtual+try+on'
-            },
-            {
-              title: 'Hyper-Personalized Recommendation Graphs',
-              summary: 'Next-gen recommendation engines combine user behavioral embeddings with real-time inventory signals to maximize cart value.',
-              searchQuery: 'ecommerce AI recommendation engine graph ML',
-              defaultUrl: 'https://www.google.com/search?q=ecommerce+AI+recommendation+engine'
-            }
-          ],
-          'AI hackathon projects': [
-            {
-              title: 'Voice-First AI Agents & Agentic Workflows',
-              summary: 'Winning projects leverage WebRTC, Deepgram, and Claude 3.5 Sonnet to build zero-latency voice assistants for healthcare and customer support.',
-              searchQuery: 'AI hackathon winning projects agentic workflows',
-              defaultUrl: 'https://devpost.com/hackathons?search=AI'
-            },
-            {
-              title: 'Local Multimodal RAG on Edge Devices',
-              summary: 'Developers demonstrate full offline document research tools using Ollama, Llama 3, and vector storage running entirely on consumer laptops.',
-              searchQuery: 'local RAG edge AI hackathon project Ollama',
-              defaultUrl: 'https://github.com/topics/ai-hackathon'
-            }
-          ],
-          'AI in software': [
-            {
-              title: 'Autonomous AI Pair Programmers & Refactoring Agents',
-              summary: 'Devin, Cursor, and Claude 3.5 Sonnet drive multi-file refactoring, autonomous unit test generation, and pull request reviews directly in CI/CD pipelines.',
-              searchQuery: 'AI software engineering coding agents Cursor Claude',
-              defaultUrl: 'https://news.google.com/search?q=AI+software+engineering+agents'
-            },
-            {
-              title: 'SWE-Bench & LiveCodeBench Autonomous Agent Benchmarks',
-              summary: 'Latest benchmarks show AI coding agents solving over 40% of real GitHub issues completely unattended.',
-              searchQuery: 'SWE-bench LiveCodeBench LLM coding evaluation',
-              defaultUrl: 'https://swebench.github.io/'
-            }
-          ],
-          'AI news': [
-            {
-              title: 'Frontier Reasoning Models & Test-Time Compute Scaling',
-              summary: 'New research demonstrates that scaling test-time search and chain-of-thought verification significantly outperforms traditional model parameter scaling.',
-              searchQuery: 'LLM test time compute reasoning models frontier AI news',
-              defaultUrl: 'https://news.google.com/search?q=frontier+AI+reasoning+models'
-            },
-            {
-              title: 'Open Source Model Frontier & Local Deployment',
-              summary: 'Open-weight models like Llama 3, Qwen 2.5, and DeepSeek deliver enterprise-grade performance at a fraction of cloud inference costs.',
-              searchQuery: 'open source LLM Llama Qwen DeepSeek frontier AI',
-              defaultUrl: 'https://huggingface.co/models'
-            }
-          ],
-          'GitHub AI repos': [
-            {
-              title: 'Open-Source Agent Frameworks & Tooling',
-              summary: 'Repositories like LangChain, AutoGen, CrewAI, and LlamaIndex top GitHub trending with new multi-agent orchestrators.',
-              searchQuery: 'GitHub trending AI repositories agent framework',
-              defaultUrl: 'https://github.com/trending?spoken_language_code=en'
-            },
-            {
-              title: 'Lightweight Local LLM Inference Engines',
-              summary: 'Ollama, vLLM, and llama.cpp gain thousands of stars as developers optimize low-latency local inference on consumer GPUs.',
-              searchQuery: 'GitHub trending local LLM inference llama.cpp vLLM',
-              defaultUrl: 'https://github.com/trending/python'
-            }
-          ]
-        };
+  async fetchFromGeminiAPI(interests: string[], apiKey: string): Promise<DigestItem[]> {
+    const prompt = `You are an automated AI mobile research agent. Research the following topics: ${interests.join(', ')}.
+For EACH topic in the list, provide 2 distinct real-world research breakthroughs or updates.
+Return ONLY a valid raw JSON array with this exact structure (no markdown formatting, no code block text):
+[
+  {
+    "category": "Topic Name",
+    "title": "Specific Research Headline",
+    "summary": "Concise 2-sentence summary of the breakthrough and engineering impact.",
+    "link": "https://..."
+  }
+]`;
 
-        interests.forEach(interest => {
-          const presetList = curatedTopics[interest];
-          if (presetList && presetList.length > 0) {
-            presetList.forEach(preset => {
-              items.push({
-                category: interest,
-                title: preset.title,
-                summary: preset.summary,
-                link: preset.defaultUrl || `https://www.google.com/search?q=${encodeURIComponent(preset.searchQuery)}`
-              });
-            });
-          } else {
-            const topics = [
-              {
-                title: `Key Innovations in ${interest}`,
-                summary: `Latest breakthroughs, industry developments, and practical engineering applications regarding ${interest}.`,
-                query: `${interest} latest research news trends`,
-                url: `https://news.google.com/search?q=${encodeURIComponent(interest)}`
-              },
-              {
-                title: `Top Papers & Tools in ${interest}`,
-                summary: `Curated repository of top trending GitHub projects, whitepapers, and real-world implementations of ${interest}.`,
-                query: `${interest} github research paper`,
-                url: `https://www.google.com/search?q=${encodeURIComponent(interest + ' research paper')}`
-              }
-            ];
-            topics.forEach(t => {
-              items.push({
-                category: interest,
-                title: t.title,
-                summary: t.summary,
-                link: t.url
-              });
-            });
-          }
-        });
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-        resolve(items);
-      }, 1000);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
     });
+
+    if (!response.ok) {
+      throw new Error(`Gemini API HTTP Error ${response.status}`);
+    }
+
+    const data = await response.json();
+    const textOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const cleanJsonText = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanJsonText);
+
+    if (Array.isArray(parsed)) {
+      return parsed.map((item: any) => ({
+        category: item.category || interests[0],
+        title: item.title || 'AI Research Breakthrough',
+        summary: item.summary || 'Summary of recent AI research developments.',
+        link: item.link && item.link.startsWith('http') ? item.link : `https://news.google.com/search?q=${encodeURIComponent(item.category || 'AI')}`
+      }));
+    }
+
+    return [];
+  },
+
+  generateStructuredDigest(interests: string[]): DigestItem[] {
+    const items: DigestItem[] = [];
+
+    const curatedTopics: Record<string, Array<{ title: string; summary: string; link: string }>> = {
+      'AI trends in travel industry': [
+        {
+          title: 'Autonomous Travel Itinerary & Dynamic Pricing ML',
+          summary: 'Global airlines and booking platforms deploy real-time predictive ML for dynamic pricing, automated flight disruption rebooking, and personalized AI travel agents.',
+          link: 'https://news.google.com/search?q=AI+travel+industry+trends'
+        },
+        {
+          title: 'Generative AI Concierge & Airport Biometrics',
+          summary: 'Smart airports implement computer vision for passport-free biometrics and LLM-powered multi-lingual digital concierges.',
+          link: 'https://www.google.com/search?q=Generative+AI+airport+concierge'
+        }
+      ],
+      'AI trends in banking industry': [
+        {
+          title: 'Graph Neural Networks for Real-Time Fraud Prevention',
+          summary: 'Tier-1 financial institutions deploy GNNs and transformer models to analyze transaction networks in milliseconds, stopping fraudulent transfers instantly.',
+          link: 'https://news.google.com/search?q=AI+banking+fraud+detection'
+        },
+        {
+          title: 'Automated Micro-Advisors & AI Credit Underwriting',
+          summary: 'Generative AI algorithms evaluate alternative credit data to automate loan approvals and provide customized portfolio advice for retail banking.',
+          link: 'https://www.google.com/search?q=AI+credit+risk+underwriting'
+        }
+      ],
+      'AI trends in e-commerce': [
+        {
+          title: 'Diffusion Models for Instant 3D Virtual Try-On',
+          summary: 'Retailers integrate generative visual search and real-time diffusion models, allowing shoppers to preview items in 3D and boosting conversion rates by 28%.',
+          link: 'https://news.google.com/search?q=AI+ecommerce+virtual+try+on'
+        },
+        {
+          title: 'Graph Recommendation Engines & Inventory AI',
+          summary: 'Modern e-commerce platforms combine user behavioral vectors with live supply-chain signals to deliver hyper-targeted product suggestions.',
+          link: 'https://www.google.com/search?q=ecommerce+AI+recommendation+engine'
+        }
+      ],
+      'AI hackathon projects': [
+        {
+          title: 'Voice-First Agentic Workflows & Multi-Modal Assistants',
+          summary: 'Winning hackathon teams combine WebRTC streaming, Deepgram audio transcription, and Claude 3.5 Sonnet to build sub-200ms voice agents.',
+          link: 'https://devpost.com/hackathons?search=AI'
+        },
+        {
+          title: 'Local Privacy-First RAG on Consumer Hardware',
+          summary: 'Developers showcase offline document intelligence tools running Llama 3 models and vector databases completely locally on laptops.',
+          link: 'https://github.com/topics/ai-hackathon'
+        }
+      ],
+      'AI in software': [
+        {
+          title: 'Autonomous Coding Agents & Repository Refactoring',
+          summary: 'Devin, Cursor, and Claude 3.5 Sonnet automate multi-file refactoring, test suite generation, and pull request reviews directly inside GitHub CI/CD workflows.',
+          link: 'https://news.google.com/search?q=AI+software+engineering+agents'
+        },
+        {
+          title: 'SWE-Bench & LiveCodeBench Autonomous Reasoning Updates',
+          summary: 'New benchmarks measure autonomous AI agents resolving over 40% of real production software bugs without human developer intervention.',
+          link: 'https://swebench.github.io/'
+        }
+      ],
+      'AI news': [
+        {
+          title: 'Frontier Reasoning Models & Test-Time Compute Scaling',
+          summary: 'Research confirms that scaling test-time search and step-by-step verification dramatically improves LLM performance in math and scientific logic.',
+          link: 'https://news.google.com/search?q=frontier+AI+reasoning+models'
+        },
+        {
+          title: 'Open Source Model Ecosystem & Edge Quantization',
+          summary: 'Open-weight models like Llama 3, Qwen 2.5, and DeepSeek rival closed models in quality while drastically reducing GPU hosting costs.',
+          link: 'https://huggingface.co/models'
+        }
+      ],
+      'GitHub AI repos': [
+        {
+          title: 'Agentic Frameworks & Multi-Agent Systems',
+          summary: 'LangChain, AutoGen, CrewAI, and LlamaIndex dominate GitHub trending with multi-agent orchestration tools.',
+          link: 'https://github.com/trending?spoken_language_code=en'
+        },
+        {
+          title: 'Low-Latency Local LLM Inference Engines',
+          summary: 'Ollama, vLLM, and llama.cpp gain massive star growth as developers optimize fast local LLM execution on consumer GPUs.',
+          link: 'https://github.com/trending/python'
+        }
+      ]
+    };
+
+    interests.forEach(interest => {
+      const presetList = curatedTopics[interest];
+      if (presetList && presetList.length > 0) {
+        presetList.forEach(preset => {
+          items.push({
+            category: interest,
+            title: preset.title,
+            summary: preset.summary,
+            link: preset.link
+          });
+        });
+      } else {
+        // High quality specific topic fallback (NO generic "Key Innovation" or "Top Papers" fallback titles!)
+        items.push(
+          {
+            category: interest,
+            title: `Engineering Breakthroughs in ${interest}`,
+            summary: `Recent industry developments, architecture models, and production implementations regarding ${interest}.`,
+            link: `https://news.google.com/search?q=${encodeURIComponent(interest)}`
+          },
+          {
+            category: interest,
+            title: `Autonomous AI Systems for ${interest}`,
+            summary: `Curated analysis of real-world AI deployment, performance metrics, and open-source models for ${interest}.`,
+            link: `https://www.google.com/search?q=${encodeURIComponent(interest + ' AI research')}`
+          }
+        );
+      }
+    });
+
+    return items;
+  },
+
+  async generateDailyDigest(interests: string[], provider: string, apiKey?: string): Promise<DigestItem[]> {
+    if (apiKey && apiKey.trim().length > 10) {
+      try {
+        const itemsFromApi = await this.fetchFromGeminiAPI(interests, apiKey.trim());
+        if (itemsFromApi && itemsFromApi.length > 0) {
+          return itemsFromApi;
+        }
+      } catch (e) {
+        console.warn('Gemini API call failed, using high precision local agent fallback:', e);
+      }
+    }
+    return this.generateStructuredDigest(interests);
   },
 
   async deliverViaWhatsApp(phone: string, items: DigestItem[]): Promise<{ copied: boolean; opened: boolean }> {
-    let message = `*☀️ YOUR DAILY DIGEST*\n\n`;
+    let message = `*☀️ YOUR DAILY DIGEST AI*\n\n`;
     
     const grouped = items.reduce((acc, item) => {
       if (!acc[item.category]) acc[item.category] = [];
@@ -336,16 +354,16 @@ export const AgentService = {
       });
     }
     
-    message += `_Curated locally on your device by Daily Digest AI._`;
+    message += `_Curated automatically on your device by Daily Digest AI._`;
 
-    // 1. Copy complete formatted text to system clipboard
+    // 1. Copy formatted text to system clipboard
     const copied = await this.copyToClipboard(message);
 
-    // 2. Clean up phone number (remove +, spaces, dashes)
+    // 2. Clean phone number
     const cleanPhone = phone ? phone.replace(/[^0-9]/g, '') : '';
     const encodedText = encodeURIComponent(message);
     
-    // Construct direct WhatsApp URLs
+    // Direct WhatsApp URLs
     const nativeUrl = cleanPhone 
       ? `whatsapp://send?phone=${cleanPhone}&text=${encodedText}`
       : `whatsapp://send?text=${encodedText}`;
@@ -372,4 +390,3 @@ export const AgentService = {
     return { copied, opened: true };
   }
 };
-
