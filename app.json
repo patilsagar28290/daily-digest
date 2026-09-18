@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Daily Digest",
+    "slug": "dev-digest",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0F172A"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sagarpatil.dailydigest"
+    },
+    "android": {
+      "package": "com.sagarpatil.dailydigest",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F172A"
+      }
+    },
+    "plugins": [
+      "expo-background-fetch",
+      "expo-task-manager",
+      "expo-notifications"
+    ]
+  }
+}

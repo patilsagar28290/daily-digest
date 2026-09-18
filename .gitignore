@@ -1,0 +1,27 @@
+# Node & dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Android build outputs
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/.idea/
+
+# Environment & OS
+.DS_Store
+*.pem
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
