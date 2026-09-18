@@ -23,7 +23,9 @@ import {
   Save,
   Key,
   Trash2,
-  X
+  Clock,
+  Sun,
+  Moon
 } from 'lucide-react-native';
 
 const INITIAL_PRESETS = [
@@ -46,7 +48,7 @@ export default function SettingsScreen({ navigation }: any) {
   const [customInterest, setCustomInterest] = useState<string>('');
   const [whatsapp, setWhatsapp] = useState<string>('');
   const [autoDeliver, setAutoDeliver] = useState<boolean>(true);
-  const [digestTime, setDigestTime] = useState<string>('07:00');
+  const [scheduleMode, setScheduleMode] = useState<'twice_daily' | 'daily'>('twice_daily');
 
   useEffect(() => {
     if (preferences) {
@@ -54,22 +56,21 @@ export default function SettingsScreen({ navigation }: any) {
       if (preferences.geminiApiKey) setGeminiApiKey(preferences.geminiApiKey);
       if (preferences.selectedInterests) {
         setSelectedInterests(preferences.selectedInterests);
-        // Merge user custom interests into allTopics
         const combined = Array.from(new Set([...INITIAL_PRESETS, ...preferences.selectedInterests]));
         setAllTopics(combined);
       }
       if (preferences.whatsappNumber) setWhatsapp(preferences.whatsappNumber);
       if (preferences.autoDeliverWhatsApp !== undefined) setAutoDeliver(preferences.autoDeliverWhatsApp);
-      if (preferences.digestTime) setDigestTime(preferences.digestTime);
+      if (preferences.scheduleFrequency) setScheduleMode(preferences.scheduleFrequency);
     }
   }, [preferences]);
 
-  const toggleInterest = (interest: string) => {
+  const toggleInterest = (topic: string) => {
     setSelectedInterests(prev => {
-      if (prev.includes(interest)) {
-        return prev.filter(i => i !== interest);
+      if (prev.includes(topic)) {
+        return prev.filter(t => t !== topic);
       } else {
-        return [...prev, interest];
+        return [...prev, topic];
       }
     });
   };
@@ -112,7 +113,8 @@ export default function SettingsScreen({ navigation }: any) {
       geminiApiKey: geminiApiKey.trim(),
       whatsappNumber: whatsapp.trim(),
       autoDeliverWhatsApp: autoDeliver,
-      digestTime,
+      scheduleFrequency: scheduleMode,
+      digestTime: scheduleMode === 'twice_daily' ? '08:00 & 20:00' : '08:00',
       isOnboarded: true
     });
 
@@ -123,25 +125,62 @@ export default function SettingsScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Sleek Minimal Header */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
           <ArrowLeft color="#F8FAFC" size={18} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings & Topics</Text>
+        <Text style={styles.headerTitle}>Settings & Schedule</Text>
         <TouchableOpacity style={styles.saveHeaderBtn} onPress={handleSave}>
           <Save color="#fff" size={16} />
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Section 1: AI Provider Selection */}
+        {/* Section 1: Research Schedule (Twice Daily 8 AM & 8 PM) */}
+        <View style={styles.section}>
+          <View style={styles.sectionTitleRow}>
+            <Clock color={theme.colors.primaryLight} size={16} />
+            <Text style={styles.sectionTitle}>Automated Research Schedule</Text>
+          </View>
+          <Text style={styles.sectionSubtitle}>Twice daily morning and evening research cycles:</Text>
+
+          <View style={styles.scheduleCardsRow}>
+            <TouchableOpacity 
+              style={[styles.scheduleCard, scheduleMode === 'twice_daily' && styles.scheduleCardSelected]}
+              onPress={() => setScheduleMode('twice_daily')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.scheduleCardHeader}>
+                <Sun color="#F59E0B" size={16} />
+                <Text style={styles.plusSymbol}>+</Text>
+                <Moon color="#818CF8" size={16} />
+              </View>
+              <Text style={styles.scheduleTitle}>Twice Daily</Text>
+              <Text style={styles.scheduleTimeBadge}>8:00 AM & 8:00 PM</Text>
+              {scheduleMode === 'twice_daily' && <CheckCircle2 color={theme.colors.primaryLight} size={15} style={styles.checkPos} />}
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.scheduleCard, scheduleMode === 'daily' && styles.scheduleCardSelected]}
+              onPress={() => setScheduleMode('daily')}
+              activeOpacity={0.7}
+            >
+              <Sun color="#F59E0B" size={16} />
+              <Text style={styles.scheduleTitle}>Once Daily</Text>
+              <Text style={styles.scheduleTimeBadge}>8:00 AM Morning</Text>
+              {scheduleMode === 'daily' && <CheckCircle2 color={theme.colors.primaryLight} size={15} style={styles.checkPos} />}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Section 2: AI Intelligence Model */}
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
             <Sparkles color={theme.colors.primaryLight} size={16} />
             <Text style={styles.sectionTitle}>AI Intelligence Engine</Text>
           </View>
-          <Text style={styles.sectionSubtitle}>Primary model for background research:</Text>
+          <Text style={styles.sectionSubtitle}>Primary model for automated background research:</Text>
           
           <View style={styles.gridContainer}>
             {AI_PROVIDERS.map(p => {
@@ -163,14 +202,14 @@ export default function SettingsScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Section 2: Gemini API Key */}
+        {/* Section 3: Gemini API Key */}
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
             <Key color={theme.colors.secondary} size={16} />
             <Text style={styles.sectionTitle}>Gemini API Key (Direct Online Research)</Text>
           </View>
           <Text style={styles.sectionSubtitle}>
-            Optional API key for live web search generation:
+            Optional API key for live web search research generation:
           </Text>
 
           <TextInput
@@ -184,7 +223,7 @@ export default function SettingsScreen({ navigation }: any) {
           />
         </View>
 
-        {/* Section 3: Topics of Interest with Provision to Remove */}
+        {/* Section 4: Topics of Interest with Provision to Remove */}
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
             <Bookmark color={theme.colors.secondary} size={16} />
@@ -239,11 +278,11 @@ export default function SettingsScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Section 4: WhatsApp Automated Delivery */}
+        {/* Section 5: WhatsApp Delivery Target */}
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
             <MessageCircle color={theme.colors.whatsapp} size={16} />
-            <Text style={styles.sectionTitle}>WhatsApp Delivery</Text>
+            <Text style={styles.sectionTitle}>WhatsApp Automated Delivery</Text>
           </View>
           <Text style={styles.sectionSubtitle}>Recipient phone number with country code:</Text>
 
@@ -259,7 +298,7 @@ export default function SettingsScreen({ navigation }: any) {
           <View style={styles.toggleRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.toggleTitle}>Auto-Dispatch Digest to WhatsApp</Text>
-              <Text style={styles.toggleSubtitle}>Automate chat handoff when research finishes</Text>
+              <Text style={styles.toggleSubtitle}>Automate chat handoff on twice-daily schedule (8 AM & 8 PM)</Text>
             </View>
             <Switch
               value={autoDeliver}
@@ -273,7 +312,7 @@ export default function SettingsScreen({ navigation }: any) {
         {/* Save Button */}
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
           <Save color="#fff" size={18} />
-          <Text style={styles.saveBtnText}>Save Settings</Text>
+          <Text style={styles.saveBtnText}>Save Preferences</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -307,6 +346,22 @@ const styles = StyleSheet.create({
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: '#F8FAFC' },
   sectionSubtitle: { fontSize: 11, color: theme.colors.textSecondary, marginBottom: theme.spacing.md },
+  scheduleCardsRow: { flexDirection: 'row', gap: 8 },
+  scheduleCard: { 
+    flex: 1, 
+    padding: theme.spacing.md, 
+    backgroundColor: '#070A10', 
+    borderRadius: 10, 
+    borderWidth: 1, 
+    borderColor: '#1E2640',
+    position: 'relative'
+  },
+  scheduleCardSelected: { borderColor: theme.colors.primary, backgroundColor: `${theme.colors.primary}15` },
+  scheduleCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+  plusSymbol: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '800' },
+  scheduleTitle: { fontSize: 13, fontWeight: '700', color: '#F8FAFC', marginTop: 2 },
+  scheduleTimeBadge: { fontSize: 11, color: theme.colors.secondary, fontWeight: '600', marginTop: 2 },
+  checkPos: { position: 'absolute', top: 10, right: 10 },
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   providerCard: { 
     width: '48%', 

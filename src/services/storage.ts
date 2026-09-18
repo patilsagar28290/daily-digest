@@ -8,7 +8,8 @@ export interface UserPreferences {
   geminiApiKey?: string;
   whatsappNumber: string | null;
   autoDeliverWhatsApp?: boolean;
-  digestTime: string; // HH:mm format
+  scheduleFrequency: 'twice_daily' | 'daily'; // twice_daily = 8 AM & 8 PM
+  digestTime: string; // '08:00 & 20:00'
   isOnboarded: boolean;
 }
 
@@ -20,8 +21,9 @@ export interface DigestItem {
 }
 
 export interface DigestRun {
-  id: string; // date string YYYY-MM-DD
+  id: string; // e.g. YYYY-MM-DD-morning or YYYY-MM-DD-evening
   date: string;
+  slot: 'morning' | 'evening';
   status: 'success' | 'partial' | 'failed' | 'pending';
   items: DigestItem[];
 }
@@ -39,11 +41,17 @@ export const StorageService = {
         geminiApiKey: '',
         whatsappNumber: null,
         autoDeliverWhatsApp: true,
-        digestTime: '07:00',
+        scheduleFrequency: 'twice_daily',
+        digestTime: '08:00 & 20:00',
         isOnboarded: true,
       };
     }
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    return {
+      scheduleFrequency: 'twice_daily',
+      digestTime: '08:00 & 20:00',
+      ...parsed
+    };
   },
 
   async savePreferences(prefs: Partial<UserPreferences>): Promise<UserPreferences> {
@@ -66,7 +74,7 @@ export const StorageService = {
       history[existingIndex] = run;
     } else {
       history.unshift(run);
-      if (history.length > 30) history.pop(); // Keep last 30 days
+      if (history.length > 60) history.pop(); // Keep last 60 runs (30 days of twice daily)
     }
     await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(history));
   }

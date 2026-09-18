@@ -31,7 +31,10 @@ import {
   Check,
   Zap,
   Bot,
-  Key
+  Key,
+  Sun,
+  Moon,
+  Globe
 } from 'lucide-react-native';
 
 export default function MainDashboard({ navigation }: any) {
@@ -39,6 +42,11 @@ export default function MainDashboard({ navigation }: any) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [autoStatus, setAutoStatus] = useState<string>('');
   const [copiedItemIndex, setCopiedItemIndex] = useState<string | null>(null);
+
+  // Current slot view mode: 'morning' or 'evening'
+  const currentHour = new Date().getHours();
+  const defaultSlot: 'morning' | 'evening' = currentHour >= 18 ? 'evening' : 'morning';
+  const [activeSlot, setActiveSlot] = useState<'morning' | 'evening'>(defaultSlot);
 
   // Import Modal state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -51,20 +59,29 @@ export default function MainDashboard({ navigation }: any) {
     preferences?.aiProvider
   );
 
-  const today = new Date().toISOString().split('T')[0];
-  const todayRun = history.find(h => h.id === today);
+  const todayDateStr = new Date().toISOString().split('T')[0];
+  const activeRunId = `${todayDateStr}-${activeSlot}`;
+  const activeRun = history.find(h => h.id === activeRunId || (h.id === todayDateStr && activeSlot === 'morning'));
 
-  // Run automated research workflow on mount if not yet generated for today
+  // Run automated research workflow on mount if active slot is missing
   useEffect(() => {
-    if (isConfigured && (!todayRun || todayRun.items.length === 0)) {
-      runAutomatedDigestWorkflow();
+    if (isConfigured && (!activeRun || activeRun.items.length === 0)) {
+      runAutomatedDigestWorkflow(activeSlot);
     }
-  }, [isConfigured]);
+  }, [isConfigured, activeSlot]);
 
-  const runAutomatedDigestWorkflow = async () => {
+  const runAutomatedDigestWorkflow = async (slotOverride?: 'morning' | 'evening') => {
     if (!preferences?.selectedInterests || preferences.selectedInterests.length === 0) return;
+    
+    const slotToRun = slotOverride || activeSlot;
+    const runId = `${todayDateStr}-${slotToRun}`;
+
     setIsGenerating(true);
-    setAutoStatus(preferences.geminiApiKey ? 'Fetching live research via Gemini API...' : 'Executing automated AI research agent...');
+    setAutoStatus(
+      preferences.geminiApiKey 
+        ? `Fetching ${slotToRun.toUpperCase()} research via Gemini API...` 
+        : `Executing ${slotToRun.toUpperCase()} AI research agent...`
+    );
 
     try {
       const items = await AgentService.generateDailyDigest(
@@ -74,21 +91,26 @@ export default function MainDashboard({ navigation }: any) {
       );
 
       await updateHistory({
-        id: today,
+        id: runId,
         date: new Date().toISOString(),
+        slot: slotToRun,
         status: 'success',
         items
       });
 
-      setAutoStatus('Research complete.');
+      setAutoStatus(`${slotToRun === 'morning' ? 'Morning 8 AM' : 'Evening 8 PM'} edition compiled.`);
 
-      // Auto-dispatch to WhatsApp if phone configured and auto-deliver active
+      // Automated WhatsApp delivery trigger
       if (preferences.whatsappNumber && preferences.autoDeliverWhatsApp !== false) {
-        setAutoStatus('Dispatching digest to WhatsApp...');
+        setAutoStatus(`Auto-dispatching ${slotToRun} digest to WhatsApp...`);
         setTimeout(async () => {
           try {
-            await AgentService.deliverViaWhatsApp(preferences.whatsappNumber!, items);
-            setAutoStatus('Digest copied & launched in WhatsApp.');
+            await AgentService.deliverViaWhatsApp(
+              preferences.whatsappNumber!, 
+              items, 
+              slotToRun === 'morning' ? 'Morning 8 AM' : 'Evening 8 PM'
+            );
+            setAutoStatus(`Digest copied & launched in WhatsApp.`);
           } catch (err) {
             console.log('Automated WhatsApp dispatch notice:', err);
           }
@@ -103,16 +125,21 @@ export default function MainDashboard({ navigation }: any) {
   };
 
   const deliverDigest = async () => {
-    if (!todayRun || todayRun.items.length === 0) {
-      await runAutomatedDigestWorkflow();
+    if (!activeRun || activeRun.items.length === 0) {
+      await runAutomatedDigestWorkflow(activeSlot);
       return;
     }
     try {
-      const { copied } = await AgentService.deliverViaWhatsApp(preferences?.whatsappNumber || '', todayRun.items);
+      const slotTitle = activeSlot === 'morning' ? 'Morning (8:00 AM)' : 'Evening (8:00 PM)';
+      const { copied } = await AgentService.deliverViaWhatsApp(
+        preferences?.whatsappNumber || '', 
+        activeRun.items,
+        slotTitle
+      );
       if (copied) {
         Alert.alert(
           'WhatsApp Delivery',
-          `Full research digest copied to clipboard and targeted to ${preferences?.whatsappNumber ? preferences.whatsappNumber : 'WhatsApp'}.`
+          `${slotTitle} digest copied to clipboard and targeted to ${preferences?.whatsappNumber ? preferences.whatsappNumber : 'WhatsApp'}.`
         );
       }
     } catch (e: any) {
@@ -121,7 +148,8 @@ export default function MainDashboard({ navigation }: any) {
   };
 
   const copyItemText = async (item: DigestItem, key: string) => {
-    const textToCopy = `*${item.title}*\n${item.summary}\n${item.link ? `🔗 Source: ${item.link}` : ''}`;
+    const domain = AgentService.extractDomain(item.link);
+    const textToCopy = `*${item.title}*\n${item.summary}\n${item.link ? `🔗 Source (${domain}): ${item.link}` : ''}`;
     await AgentService.copyToClipboard(textToCopy);
     setCopiedItemIndex(key);
     setTimeout(() => setCopiedItemIndex(null), 2000);
@@ -144,12 +172,13 @@ export default function MainDashboard({ navigation }: any) {
       return;
     }
 
-    const existingItems = todayRun ? todayRun.items : [];
+    const existingItems = activeRun ? activeRun.items : [];
     const updatedItems = [...existingItems, ...newItems];
 
     await updateHistory({
-      id: today,
+      id: activeRunId,
       date: new Date().toISOString(),
+      slot: activeSlot,
       status: 'success',
       items: updatedItems
     });
@@ -178,7 +207,7 @@ export default function MainDashboard({ navigation }: any) {
             </View>
             <Text style={styles.welcomeTitle}>Automated Research Agent</Text>
             <Text style={styles.welcomeDescription}>
-              Zero-intervention AI daily research agent. Configure your topics to start automated research.
+              Zero-intervention AI daily research agent. Configure your topics for automated twice-daily research (8 AM & 8 PM).
             </Text>
 
             <TouchableOpacity 
@@ -196,14 +225,14 @@ export default function MainDashboard({ navigation }: any) {
     );
   }
 
-  // Group today's items by interest topic section
+  // Group active slot items by interest topic
   const groupedItems: Record<string, DigestItem[]> = {};
   preferences.selectedInterests.forEach(interest => {
     groupedItems[interest] = [];
   });
 
-  if (todayRun) {
-    todayRun.items.forEach(item => {
+  if (activeRun) {
+    activeRun.items.forEach(item => {
       if (!groupedItems[item.category]) {
         groupedItems[item.category] = [];
       }
@@ -213,7 +242,7 @@ export default function MainDashboard({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Top Header */}
+      {/* Sleek Top Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.greeting}>Daily Digest AI ☀️</Text>
@@ -223,7 +252,7 @@ export default function MainDashboard({ navigation }: any) {
         <View style={styles.headerRightActions}>
           <TouchableOpacity 
             style={[styles.iconBtn, isGenerating && styles.iconBtnDisabled]} 
-            onPress={runAutomatedDigestWorkflow} 
+            onPress={() => runAutomatedDigestWorkflow(activeSlot)} 
             disabled={isGenerating}
           >
             {isGenerating ? (
@@ -241,15 +270,42 @@ export default function MainDashboard({ navigation }: any) {
 
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={isGenerating} onRefresh={runAutomatedDigestWorkflow} tintColor={theme.colors.primary} />}
+        refreshControl={<RefreshControl refreshing={isGenerating} onRefresh={() => runAutomatedDigestWorkflow(activeSlot)} tintColor={theme.colors.primary} />}
         showsVerticalScrollIndicator={false}
       >
+        {/* Twice Daily Slot Switcher (8:00 AM Morning & 8:00 PM Evening) */}
+        <View style={styles.slotSwitcherRow}>
+          <TouchableOpacity
+            style={[styles.slotTab, activeSlot === 'morning' && styles.slotTabActive]}
+            onPress={() => setActiveSlot('morning')}
+            activeOpacity={0.8}
+          >
+            <Sun color={activeSlot === 'morning' ? '#F59E0B' : theme.colors.textSecondary} size={15} />
+            <Text style={[styles.slotTabText, activeSlot === 'morning' && styles.slotTabTextActive]}>
+              Morning Brief (8 AM)
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.slotTab, activeSlot === 'evening' && styles.slotTabActive]}
+            onPress={() => setActiveSlot('evening')}
+            activeOpacity={0.8}
+          >
+            <Moon color={activeSlot === 'evening' ? '#818CF8' : theme.colors.textSecondary} size={15} />
+            <Text style={[styles.slotTabText, activeSlot === 'evening' && styles.slotTabTextActive]}>
+              Evening Update (8 PM)
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Status Bar */}
         <View style={styles.statusCard}>
           <View style={styles.statusHeaderRow}>
             <View style={styles.statusBadgeRow}>
               <View style={styles.liveDot} />
-              <Text style={styles.statusBadgeTitle}>AUTOMATED AGENT ACTIVE</Text>
+              <Text style={styles.statusBadgeTitle}>
+                {activeSlot.toUpperCase()} EDITION • TWICE-DAILY AUTOMATION
+              </Text>
             </View>
 
             {preferences.geminiApiKey ? (
@@ -271,7 +327,7 @@ export default function MainDashboard({ navigation }: any) {
         </View>
 
         {/* Global Action Bar */}
-        {todayRun && todayRun.items.length > 0 && !isGenerating && (
+        {activeRun && activeRun.items.length > 0 && !isGenerating && (
           <View style={styles.globalActionsRow}>
             <TouchableOpacity 
               style={styles.whatsappPrimaryBtn} 
@@ -285,9 +341,10 @@ export default function MainDashboard({ navigation }: any) {
             <TouchableOpacity 
               style={styles.copyAllBtn} 
               onPress={async () => {
-                let allText = `☀️ *DAILY DIGEST SUMMARY*\n\n`;
-                todayRun.items.forEach((item, i) => {
-                  allText += `${i + 1}. *[${item.category}] ${item.title}*\n${item.summary}\n${item.link ? `🔗 Link: ${item.link}` : ''}\n\n`;
+                let allText = `☀️ *DAILY DIGEST SUMMARY (${activeSlot.toUpperCase()} EDITION)*\n\n`;
+                activeRun.items.forEach((item, i) => {
+                  const domain = AgentService.extractDomain(item.link);
+                  allText += `${i + 1}. *[${item.category}] ${item.title}*\n${item.summary}\n${item.link ? `🔗 Direct Link (${domain}): ${item.link}` : ''}\n\n`;
                 });
                 await AgentService.copyToClipboard(allText);
                 Alert.alert('Copied!', 'Full research digest copied to clipboard.');
@@ -320,8 +377,8 @@ export default function MainDashboard({ navigation }: any) {
                         {isGenerating 
                           ? 'Research in progress...' 
                           : hasItems 
-                            ? `${categoryItems.length} research updates` 
-                            : 'Pending daily research'}
+                            ? `${categoryItems.length} direct updates` 
+                            : 'Pending scheduled research'}
                       </Text>
                     </View>
 
@@ -335,17 +392,18 @@ export default function MainDashboard({ navigation }: any) {
                   </View>
                 </View>
 
-                {/* DO NOT SHOW ANYTHING UNTIL RESEARCH IS DONE! */}
+                {/* DO NOT SHOW ANYTHING UNDER INTEREST SECTIONS UNTIL RESEARCH IS DONE! */}
                 {isGenerating ? (
                   <View style={styles.loadingBox}>
                     <ActivityIndicator size="small" color={theme.colors.primaryLight} />
-                    <Text style={styles.loadingText}>Gathering AI research insights...</Text>
+                    <Text style={styles.loadingText}>Fetching direct AI research insights...</Text>
                   </View>
                 ) : hasItems ? (
                   <View style={styles.categoryItemsList}>
                     {categoryItems.map((item, itemIdx) => {
                       const itemKey = `${interestCategory}-${itemIdx}`;
                       const isCopied = copiedItemIndex === itemKey;
+                      const domainName = AgentService.extractDomain(item.link);
 
                       return (
                         <View key={itemIdx} style={styles.digestItem}>
@@ -359,8 +417,9 @@ export default function MainDashboard({ navigation }: any) {
                                 onPress={() => AgentService.openURL(item.link!)}
                                 activeOpacity={0.7}
                               >
-                                <ExternalLink color={theme.colors.primaryLight} size={12} />
-                                <Text style={styles.linkText} numberOfLines={1}>Source Link</Text>
+                                <Globe color={theme.colors.primaryLight} size={12} />
+                                <Text style={styles.linkText} numberOfLines={1}>{domainName}</Text>
+                                <ExternalLink color={theme.colors.primaryLight} size={10} />
                               </TouchableOpacity>
                             ) : <View />}
 
@@ -461,6 +520,23 @@ const styles = StyleSheet.create({
   welcomeBtn: { backgroundColor: theme.colors.primary, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%' },
   welcomeBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
   scrollContent: { padding: theme.spacing.md, paddingBottom: theme.spacing.xxl },
+  slotSwitcherRow: { flexDirection: 'row', gap: 8, marginBottom: theme.spacing.md },
+  slotTab: { 
+    flex: 1, 
+    paddingVertical: 10, 
+    paddingHorizontal: 12, 
+    backgroundColor: '#0F172A', 
+    borderRadius: 10, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#1E2640'
+  },
+  slotTabActive: { backgroundColor: '#1E2640', borderColor: theme.colors.primary },
+  slotTabText: { fontSize: 12, fontWeight: '600', color: theme.colors.textSecondary },
+  slotTabTextActive: { color: '#F8FAFC', fontWeight: '700' },
   statusCard: { backgroundColor: '#0F172A', padding: theme.spacing.md, borderRadius: 12, marginBottom: theme.spacing.md, borderWidth: 1, borderColor: '#1E2640' },
   statusHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   statusBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
