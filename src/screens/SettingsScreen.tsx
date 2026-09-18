@@ -22,10 +22,11 @@ import {
   Bookmark, 
   Save,
   Key,
-  Zap
+  Trash2,
+  X
 } from 'lucide-react-native';
 
-const PRESET_INTERESTS = [
+const INITIAL_PRESETS = [
   'AI trends in travel industry',
   'AI trends in banking industry',
   'AI trends in e-commerce',
@@ -41,6 +42,7 @@ export default function SettingsScreen({ navigation }: any) {
   const [selectedProvider, setSelectedProvider] = useState<string>('Gemini');
   const [geminiApiKey, setGeminiApiKey] = useState<string>('');
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [allTopics, setAllTopics] = useState<string[]>(INITIAL_PRESETS);
   const [customInterest, setCustomInterest] = useState<string>('');
   const [whatsapp, setWhatsapp] = useState<string>('');
   const [autoDeliver, setAutoDeliver] = useState<boolean>(true);
@@ -50,7 +52,12 @@ export default function SettingsScreen({ navigation }: any) {
     if (preferences) {
       if (preferences.aiProvider) setSelectedProvider(preferences.aiProvider);
       if (preferences.geminiApiKey) setGeminiApiKey(preferences.geminiApiKey);
-      if (preferences.selectedInterests) setSelectedInterests(preferences.selectedInterests);
+      if (preferences.selectedInterests) {
+        setSelectedInterests(preferences.selectedInterests);
+        // Merge user custom interests into allTopics
+        const combined = Array.from(new Set([...INITIAL_PRESETS, ...preferences.selectedInterests]));
+        setAllTopics(combined);
+      }
       if (preferences.whatsappNumber) setWhatsapp(preferences.whatsappNumber);
       if (preferences.autoDeliverWhatsApp !== undefined) setAutoDeliver(preferences.autoDeliverWhatsApp);
       if (preferences.digestTime) setDigestTime(preferences.digestTime);
@@ -70,10 +77,27 @@ export default function SettingsScreen({ navigation }: any) {
   const addCustomInterest = () => {
     const trimmed = customInterest.trim();
     if (!trimmed) return;
+    if (!allTopics.includes(trimmed)) {
+      setAllTopics(prev => [...prev, trimmed]);
+    }
     if (!selectedInterests.includes(trimmed)) {
       setSelectedInterests(prev => [...prev, trimmed]);
     }
     setCustomInterest('');
+  };
+
+  const removeTopicCompletely = (topic: string) => {
+    Alert.alert('Remove Topic', `Are you sure you want to remove "${topic}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { 
+        text: 'Remove', 
+        style: 'destructive',
+        onPress: () => {
+          setAllTopics(prev => prev.filter(t => t !== topic));
+          setSelectedInterests(prev => prev.filter(t => t !== topic));
+        }
+      }
+    ]);
   };
 
   const handleSave = async () => {
@@ -92,21 +116,21 @@ export default function SettingsScreen({ navigation }: any) {
       isOnboarded: true
     });
 
-    Alert.alert('Settings Saved', 'Your Daily Digest preferences have been updated!', [
+    Alert.alert('Settings Saved', 'Preferences updated successfully!', [
       { text: 'OK', onPress: () => navigation.goBack() }
     ]);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Sleek Minimal Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft color="#F8FAFC" size={20} />
+          <ArrowLeft color="#F8FAFC" size={18} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Preferences & Setup</Text>
+        <Text style={styles.headerTitle}>Settings & Topics</Text>
         <TouchableOpacity style={styles.saveHeaderBtn} onPress={handleSave}>
-          <Save color="#fff" size={18} />
+          <Save color="#fff" size={16} />
         </TouchableOpacity>
       </View>
 
@@ -114,10 +138,10 @@ export default function SettingsScreen({ navigation }: any) {
         {/* Section 1: AI Provider Selection */}
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
-            <Sparkles color={theme.colors.primaryLight} size={18} />
-            <Text style={styles.sectionTitle}>AI Model Selection</Text>
+            <Sparkles color={theme.colors.primaryLight} size={16} />
+            <Text style={styles.sectionTitle}>AI Intelligence Engine</Text>
           </View>
-          <Text style={styles.sectionSubtitle}>Select primary model for automated research:</Text>
+          <Text style={styles.sectionSubtitle}>Primary model for background research:</Text>
           
           <View style={styles.gridContainer}>
             {AI_PROVIDERS.map(p => {
@@ -132,21 +156,21 @@ export default function SettingsScreen({ navigation }: any) {
                   <Text style={[styles.providerName, isSelected && styles.providerNameSelected]}>
                     {p.name}
                   </Text>
-                  {isSelected && <CheckCircle2 color={theme.colors.primaryLight} size={16} />}
+                  {isSelected && <CheckCircle2 color={theme.colors.primaryLight} size={15} />}
                 </TouchableOpacity>
               );
             })}
           </View>
         </View>
 
-        {/* Section 2: Gemini API Key (Direct Zero-Intervention Execution) */}
+        {/* Section 2: Gemini API Key */}
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
-            <Key color={theme.colors.secondary} size={18} />
-            <Text style={styles.sectionTitle}>Google Gemini API Key (Direct Automation)</Text>
+            <Key color={theme.colors.secondary} size={16} />
+            <Text style={styles.sectionTitle}>Gemini API Key (Direct Online Research)</Text>
           </View>
           <Text style={styles.sectionSubtitle}>
-            Enter your free Gemini API key to run live online AI research in background without launching app:
+            Optional API key for live web search generation:
           </Text>
 
           <TextInput
@@ -160,34 +184,46 @@ export default function SettingsScreen({ navigation }: any) {
           />
         </View>
 
-        {/* Section 3: Monitored Interests */}
+        {/* Section 3: Topics of Interest with Provision to Remove */}
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
-            <Bookmark color={theme.colors.secondary} size={18} />
+            <Bookmark color={theme.colors.secondary} size={16} />
             <Text style={styles.sectionTitle}>Topics of Interest</Text>
           </View>
-          <Text style={styles.sectionSubtitle}>Select topics to track daily (each topic gets its own section):</Text>
+          <Text style={styles.sectionSubtitle}>Tap to toggle. Tap 🗑️ to delete custom or unwanted topics:</Text>
 
           <View style={styles.interestsList}>
-            {PRESET_INTERESTS.map(interest => {
-              const isSelected = selectedInterests.includes(interest);
+            {allTopics.map(topic => {
+              const isSelected = selectedInterests.includes(topic);
               return (
-                <TouchableOpacity
-                  key={interest}
+                <View 
+                  key={topic} 
                   style={[styles.interestChip, isSelected && styles.interestChipSelected]}
-                  onPress={() => toggleInterest(interest)}
-                  activeOpacity={0.7}
                 >
-                  <Text style={[styles.interestText, isSelected && styles.interestTextSelected]}>
-                    {interest}
-                  </Text>
-                  {isSelected && <CheckCircle2 color={theme.colors.success} size={16} />}
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.interestChipTextTouch}
+                    onPress={() => toggleInterest(topic)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.interestText, isSelected && styles.interestTextSelected]}>
+                      {topic}
+                    </Text>
+                    {isSelected && <CheckCircle2 color={theme.colors.success} size={15} />}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.deleteTopicBtn}
+                    onPress={() => removeTopicCompletely(topic)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Trash2 color="#EF4444" size={14} />
+                  </TouchableOpacity>
+                </View>
               );
             })}
           </View>
 
-          <Text style={styles.fieldLabel}>Add Custom Topic</Text>
+          <Text style={styles.fieldLabel}>Add New Custom Topic</Text>
           <View style={styles.customInputRow}>
             <TextInput
               style={styles.customInput}
@@ -198,7 +234,7 @@ export default function SettingsScreen({ navigation }: any) {
               onSubmitEditing={addCustomInterest}
             />
             <TouchableOpacity style={styles.addBtn} onPress={addCustomInterest}>
-              <Plus color="#fff" size={18} />
+              <Plus color="#fff" size={16} />
             </TouchableOpacity>
           </View>
         </View>
@@ -206,8 +242,8 @@ export default function SettingsScreen({ navigation }: any) {
         {/* Section 4: WhatsApp Automated Delivery */}
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
-            <MessageCircle color={theme.colors.whatsapp} size={18} />
-            <Text style={styles.sectionTitle}>Automated WhatsApp Delivery</Text>
+            <MessageCircle color={theme.colors.whatsapp} size={16} />
+            <Text style={styles.sectionTitle}>WhatsApp Delivery</Text>
           </View>
           <Text style={styles.sectionSubtitle}>Recipient phone number with country code:</Text>
 
@@ -223,7 +259,7 @@ export default function SettingsScreen({ navigation }: any) {
           <View style={styles.toggleRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.toggleTitle}>Auto-Dispatch Digest to WhatsApp</Text>
-              <Text style={styles.toggleSubtitle}>Trigger direct message dispatch when daily digest compiles</Text>
+              <Text style={styles.toggleSubtitle}>Automate chat handoff when research finishes</Text>
             </View>
             <Switch
               value={autoDeliver}
@@ -234,28 +270,10 @@ export default function SettingsScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Section 5: Schedule */}
-        <View style={styles.section}>
-          <Text style={styles.fieldLabel}>Preferred Schedule Time</Text>
-          <View style={styles.timeRow}>
-            {['06:00', '07:00', '08:00', '09:00'].map(t => (
-              <TouchableOpacity
-                key={t}
-                style={[styles.timeChip, digestTime === t && styles.timeChipSelected]}
-                onPress={() => setDigestTime(t)}
-              >
-                <Text style={[styles.timeText, digestTime === t && styles.timeTextSelected]}>
-                  {t} AM
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
         {/* Save Button */}
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
-          <Save color="#fff" size={20} />
-          <Text style={styles.saveBtnText}>Save Preferences & Apply</Text>
+          <Save color="#fff" size={18} />
+          <Text style={styles.saveBtnText}>Save Settings</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -263,109 +281,107 @@ export default function SettingsScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#090D16' },
+  container: { flex: 1, backgroundColor: '#070A10' },
   header: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    paddingHorizontal: theme.spacing.lg, 
-    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md, 
+    paddingVertical: 12,
     backgroundColor: '#0F172A',
     borderBottomWidth: 1,
-    borderBottomColor: '#1E293B'
+    borderBottomColor: '#1E2640'
   },
-  iconBtn: { padding: 8, backgroundColor: '#1E293B', borderRadius: 10, borderWidth: 1, borderColor: '#334155' },
-  saveHeaderBtn: { padding: 8, backgroundColor: theme.colors.primary, borderRadius: 10 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#F8FAFC' },
+  iconBtn: { padding: 8, backgroundColor: '#1E2640', borderRadius: 8 },
+  saveHeaderBtn: { padding: 8, backgroundColor: theme.colors.primary, borderRadius: 8 },
+  headerTitle: { fontSize: 16, fontWeight: '800', color: '#F8FAFC' },
   scrollContent: { padding: theme.spacing.md, paddingBottom: theme.spacing.xxl },
   section: { 
-    backgroundColor: '#131C2E', 
+    backgroundColor: '#0F172A', 
     padding: theme.spacing.md, 
-    borderRadius: 16, 
+    borderRadius: 14, 
     marginBottom: theme.spacing.md,
     borderWidth: 1,
-    borderColor: '#22324D'
+    borderColor: '#1E2640'
   },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#F8FAFC' },
-  sectionSubtitle: { fontSize: 12, color: theme.colors.textSecondary, marginBottom: theme.spacing.md },
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#F8FAFC' },
+  sectionSubtitle: { fontSize: 11, color: theme.colors.textSecondary, marginBottom: theme.spacing.md },
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   providerCard: { 
     width: '48%', 
     padding: theme.spacing.md, 
-    backgroundColor: '#0B132B', 
-    borderRadius: 10, 
+    backgroundColor: '#070A10', 
+    borderRadius: 8, 
     borderWidth: 1, 
-    borderColor: '#1E293B',
+    borderColor: '#1E2640',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center'
   },
-  providerCardSelected: { borderColor: theme.colors.primary, backgroundColor: `${theme.colors.primary}20` },
-  providerName: { fontSize: 13, color: theme.colors.textSecondary, fontWeight: '500' },
+  providerCardSelected: { borderColor: theme.colors.primary, backgroundColor: `${theme.colors.primary}18` },
+  providerName: { fontSize: 12, color: theme.colors.textSecondary, fontWeight: '500' },
   providerNameSelected: { color: '#F8FAFC', fontWeight: '700' },
-  interestsList: { gap: 8, marginBottom: theme.spacing.md },
+  interestsList: { gap: 6, marginBottom: theme.spacing.md },
   interestChip: { 
-    padding: theme.spacing.md, 
-    backgroundColor: '#0B132B', 
-    borderRadius: 10, 
+    paddingHorizontal: theme.spacing.md, 
+    paddingVertical: 8,
+    backgroundColor: '#070A10', 
+    borderRadius: 8, 
     borderWidth: 1, 
-    borderColor: '#1E293B',
+    borderColor: '#1E2640',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center'
   },
-  interestChipSelected: { borderColor: theme.colors.secondary, backgroundColor: `${theme.colors.secondary}15` },
-  interestText: { fontSize: 13, color: theme.colors.textSecondary },
+  interestChipSelected: { borderColor: theme.colors.secondary, backgroundColor: `${theme.colors.secondary}12` },
+  interestChipTextTouch: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  interestText: { fontSize: 12, color: theme.colors.textSecondary },
   interestTextSelected: { color: '#F8FAFC', fontWeight: '600' },
-  fieldLabel: { fontSize: 13, fontWeight: '600', color: '#F8FAFC', marginBottom: 6, marginTop: 4 },
+  deleteTopicBtn: { padding: 4, marginLeft: 8 },
+  fieldLabel: { fontSize: 12, fontWeight: '600', color: '#F8FAFC', marginBottom: 6, marginTop: 4 },
   customInputRow: { flexDirection: 'row', gap: 8 },
   customInput: { 
     flex: 1, 
-    backgroundColor: '#0B132B', 
+    backgroundColor: '#070A10', 
     paddingHorizontal: theme.spacing.md, 
-    paddingVertical: 10, 
-    borderRadius: 10, 
+    paddingVertical: 8, 
+    borderRadius: 8, 
     color: '#F8FAFC', 
-    fontSize: 13,
+    fontSize: 12,
     borderWidth: 1, 
-    borderColor: '#1E293B' 
+    borderColor: '#1E2640' 
   },
-  addBtn: { backgroundColor: theme.colors.secondary, paddingHorizontal: 16, justifyContent: 'center', alignItems: 'center', borderRadius: 10 },
+  addBtn: { backgroundColor: theme.colors.secondary, paddingHorizontal: 14, justifyContent: 'center', alignItems: 'center', borderRadius: 8 },
   textInput: { 
-    backgroundColor: '#0B132B', 
+    backgroundColor: '#070A10', 
     padding: theme.spacing.md, 
-    borderRadius: 10, 
+    borderRadius: 8, 
     color: '#F8FAFC', 
-    fontSize: 13,
+    fontSize: 12,
     borderWidth: 1, 
-    borderColor: '#1E293B' 
+    borderColor: '#1E2640' 
   },
   toggleRow: { 
     flexDirection: 'row', 
     alignItems: 'center', 
     justifyContent: 'space-between',
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: 10,
+    paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#1E293B'
+    borderTopColor: '#1E2640'
   },
-  toggleTitle: { fontSize: 13, fontWeight: '700', color: '#F8FAFC' },
-  toggleSubtitle: { fontSize: 11, color: theme.colors.textSecondary },
-  timeRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  timeChip: { flex: 1, padding: theme.spacing.sm, backgroundColor: '#0B132B', borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
-  timeChipSelected: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary },
-  timeText: { fontSize: 12, color: theme.colors.textSecondary },
-  timeTextSelected: { color: '#fff', fontWeight: '700' },
+  toggleTitle: { fontSize: 12, fontWeight: '700', color: '#F8FAFC' },
+  toggleSubtitle: { fontSize: 10, color: theme.colors.textSecondary },
   saveBtn: { 
     backgroundColor: theme.colors.primary, 
-    padding: theme.spacing.md, 
-    borderRadius: 12, 
+    padding: 12, 
+    borderRadius: 10, 
     flexDirection: 'row', 
     justifyContent: 'center', 
     alignItems: 'center', 
     gap: 8,
     marginBottom: theme.spacing.xl
   },
-  saveBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' }
+  saveBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' }
 });

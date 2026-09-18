@@ -20,7 +20,6 @@ import {
   Settings, 
   RefreshCw, 
   Send, 
-  Calendar, 
   Sparkles, 
   ExternalLink, 
   Sliders, 
@@ -55,7 +54,7 @@ export default function MainDashboard({ navigation }: any) {
   const today = new Date().toISOString().split('T')[0];
   const todayRun = history.find(h => h.id === today);
 
-  // Auto-run daily workflow on component mount with ZERO human intervention
+  // Run automated research workflow on mount if not yet generated for today
   useEffect(() => {
     if (isConfigured && (!todayRun || todayRun.items.length === 0)) {
       runAutomatedDigestWorkflow();
@@ -65,7 +64,7 @@ export default function MainDashboard({ navigation }: any) {
   const runAutomatedDigestWorkflow = async () => {
     if (!preferences?.selectedInterests || preferences.selectedInterests.length === 0) return;
     setIsGenerating(true);
-    setAutoStatus(preferences.geminiApiKey ? 'Calling Gemini API for live research...' : 'Running automated AI research agent...');
+    setAutoStatus(preferences.geminiApiKey ? 'Fetching live research via Gemini API...' : 'Executing automated AI research agent...');
 
     try {
       const items = await AgentService.generateDailyDigest(
@@ -81,15 +80,15 @@ export default function MainDashboard({ navigation }: any) {
         items
       });
 
-      setAutoStatus('Research compiled successfully.');
+      setAutoStatus('Research complete.');
 
-      // Automated WhatsApp delivery trigger with ZERO human intervention
+      // Auto-dispatch to WhatsApp if phone configured and auto-deliver active
       if (preferences.whatsappNumber && preferences.autoDeliverWhatsApp !== false) {
-        setAutoStatus('Auto-dispatching digest to WhatsApp...');
+        setAutoStatus('Dispatching digest to WhatsApp...');
         setTimeout(async () => {
           try {
             await AgentService.deliverViaWhatsApp(preferences.whatsappNumber!, items);
-            setAutoStatus('Digest dispatched to WhatsApp automatically.');
+            setAutoStatus('Digest copied & launched in WhatsApp.');
           } catch (err) {
             console.log('Automated WhatsApp dispatch notice:', err);
           }
@@ -105,7 +104,6 @@ export default function MainDashboard({ navigation }: any) {
 
   const deliverDigest = async () => {
     if (!todayRun || todayRun.items.length === 0) {
-      Alert.alert('No Research Data', 'Generating today\'s digest automatically now...');
       await runAutomatedDigestWorkflow();
       return;
     }
@@ -113,8 +111,8 @@ export default function MainDashboard({ navigation }: any) {
       const { copied } = await AgentService.deliverViaWhatsApp(preferences?.whatsappNumber || '', todayRun.items);
       if (copied) {
         Alert.alert(
-          'Automated WhatsApp Delivery',
-          `Daily Digest research copied to clipboard and launched in WhatsApp${preferences?.whatsappNumber ? ` for ${preferences.whatsappNumber}` : ''}.`
+          'WhatsApp Delivery',
+          `Full research digest copied to clipboard and targeted to ${preferences?.whatsappNumber ? preferences.whatsappNumber : 'WhatsApp'}.`
         );
       }
     } catch (e: any) {
@@ -136,10 +134,7 @@ export default function MainDashboard({ navigation }: any) {
   };
 
   const handleImportAIResponse = async () => {
-    if (!importText.trim()) {
-      Alert.alert('Empty Input', 'Please paste the AI output text.');
-      return;
-    }
+    if (!importText.trim()) return;
 
     const category = selectedImportCategory || preferences?.selectedInterests[0] || 'General AI Research';
     const newItems = AgentService.parseImportedText(importText, category);
@@ -163,28 +158,27 @@ export default function MainDashboard({ navigation }: any) {
     setImportText('');
   };
 
-  // Welcome / Unconfigured state
   if (!isConfigured) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Bot color={theme.colors.primaryLight} size={24} />
+            <Bot color={theme.colors.primaryLight} size={22} />
             <Text style={styles.appTitle}>Daily Digest AI</Text>
           </View>
           <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Settings')}>
-            <Settings color={theme.colors.text} size={20} />
+            <Settings color={theme.colors.text} size={18} />
           </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.welcomeScroll} showsVerticalScrollIndicator={false}>
           <View style={styles.welcomeCard}>
             <View style={styles.welcomeIconContainer}>
-              <Zap color={theme.colors.primaryLight} size={40} />
+              <Zap color={theme.colors.primaryLight} size={36} />
             </View>
             <Text style={styles.welcomeTitle}>Automated Research Agent</Text>
             <Text style={styles.welcomeDescription}>
-              Zero-intervention daily AI research summary engine. Select topics of interest and optional Gemini API Key to run automated research.
+              Zero-intervention AI daily research agent. Configure your topics to start automated research.
             </Text>
 
             <TouchableOpacity 
@@ -192,8 +186,8 @@ export default function MainDashboard({ navigation }: any) {
               onPress={() => navigation.navigate('Settings')}
               activeOpacity={0.85}
             >
-              <Sliders color="#fff" size={18} />
-              <Text style={styles.welcomeBtnText}>Configure Preferences</Text>
+              <Sliders color="#fff" size={16} />
+              <Text style={styles.welcomeBtnText}>Configure Setup</Text>
               <ArrowRight color="#fff" size={16} />
             </TouchableOpacity>
           </View>
@@ -219,7 +213,7 @@ export default function MainDashboard({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Sleek Header */}
+      {/* Top Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.greeting}>Daily Digest AI ☀️</Text>
@@ -235,12 +229,12 @@ export default function MainDashboard({ navigation }: any) {
             {isGenerating ? (
               <ActivityIndicator size="small" color={theme.colors.primaryLight} />
             ) : (
-              <RefreshCw color={theme.colors.text} size={18} />
+              <RefreshCw color={theme.colors.text} size={16} />
             )}
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Settings')}>
-            <Settings color={theme.colors.text} size={18} />
+            <Settings color={theme.colors.text} size={16} />
           </TouchableOpacity>
         </View>
       </View>
@@ -250,38 +244,25 @@ export default function MainDashboard({ navigation }: any) {
         refreshControl={<RefreshControl refreshing={isGenerating} onRefresh={runAutomatedDigestWorkflow} tintColor={theme.colors.primary} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Executive Auto-Pilot Status Bar */}
+        {/* Status Bar */}
         <View style={styles.statusCard}>
           <View style={styles.statusHeaderRow}>
             <View style={styles.statusBadgeRow}>
               <View style={styles.liveDot} />
-              <Text style={styles.statusBadgeTitle}>ZERO-INTERVENTION AUTOMATION</Text>
+              <Text style={styles.statusBadgeTitle}>AUTOMATED AGENT ACTIVE</Text>
             </View>
 
             {preferences.geminiApiKey ? (
               <View style={styles.apiActiveBadge}>
-                <Key color={theme.colors.secondary} size={12} />
-                <Text style={styles.apiActiveText}>Gemini API Active</Text>
+                <Key color={theme.colors.secondary} size={11} />
+                <Text style={styles.apiActiveText}>Gemini API</Text>
               </View>
             ) : (
               <View style={styles.localActiveBadge}>
-                <Cpu color={theme.colors.primaryLight} size={12} />
-                <Text style={styles.localActiveText}>Local AI Agent</Text>
+                <Cpu color={theme.colors.primaryLight} size={11} />
+                <Text style={styles.localActiveText}>Local AI</Text>
               </View>
             )}
-          </View>
-
-          <View style={styles.agentMetaRow}>
-            <View style={styles.agentMetaPill}>
-              <Text style={styles.agentMetaText}>Model: <Text style={styles.agentMetaHighlight}>{preferences.aiProvider || 'Gemini'}</Text></Text>
-            </View>
-
-            {preferences.whatsappNumber ? (
-              <View style={styles.agentMetaPill}>
-                <Send color={theme.colors.whatsapp} size={12} />
-                <Text style={styles.agentMetaText}>Target: <Text style={styles.agentMetaHighlight}>{preferences.whatsappNumber}</Text></Text>
-              </View>
-            ) : null}
           </View>
 
           {autoStatus ? (
@@ -289,16 +270,16 @@ export default function MainDashboard({ navigation }: any) {
           ) : null}
         </View>
 
-        {/* Global One-Tap WhatsApp Dispatch Button */}
-        {todayRun && todayRun.items.length > 0 && (
+        {/* Global Action Bar */}
+        {todayRun && todayRun.items.length > 0 && !isGenerating && (
           <View style={styles.globalActionsRow}>
             <TouchableOpacity 
               style={styles.whatsappPrimaryBtn} 
               onPress={deliverDigest}
               activeOpacity={0.85}
             >
-              <Send color="#fff" size={16} />
-              <Text style={styles.whatsappPrimaryBtnText}>Direct WhatsApp Delivery</Text>
+              <Send color="#fff" size={15} />
+              <Text style={styles.whatsappPrimaryBtnText}>Send to WhatsApp</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -313,7 +294,7 @@ export default function MainDashboard({ navigation }: any) {
               }}
               activeOpacity={0.85}
             >
-              <Copy color={theme.colors.text} size={15} />
+              <Copy color={theme.colors.text} size={14} />
               <Text style={styles.copyAllBtnText}>Copy All</Text>
             </TouchableOpacity>
           </View>
@@ -323,6 +304,7 @@ export default function MainDashboard({ navigation }: any) {
         <View style={styles.sectionsContainer}>
           {preferences.selectedInterests.map((interestCategory, catIdx) => {
             const categoryItems = groupedItems[interestCategory] || [];
+            const hasItems = categoryItems.length > 0;
 
             return (
               <View key={interestCategory} style={styles.interestSectionCard}>
@@ -334,7 +316,13 @@ export default function MainDashboard({ navigation }: any) {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.sectionTitle} numberOfLines={1}>{interestCategory}</Text>
-                      <Text style={styles.sectionSubtitle}>{categoryItems.length} research updates</Text>
+                      <Text style={styles.sectionSubtitle}>
+                        {isGenerating 
+                          ? 'Research in progress...' 
+                          : hasItems 
+                            ? `${categoryItems.length} research updates` 
+                            : 'Pending daily research'}
+                      </Text>
                     </View>
 
                     <TouchableOpacity 
@@ -347,8 +335,13 @@ export default function MainDashboard({ navigation }: any) {
                   </View>
                 </View>
 
-                {/* Category Items */}
-                {categoryItems.length > 0 ? (
+                {/* DO NOT SHOW ANYTHING UNTIL RESEARCH IS DONE! */}
+                {isGenerating ? (
+                  <View style={styles.loadingBox}>
+                    <ActivityIndicator size="small" color={theme.colors.primaryLight} />
+                    <Text style={styles.loadingText}>Gathering AI research insights...</Text>
+                  </View>
+                ) : hasItems ? (
                   <View style={styles.categoryItemsList}>
                     {categoryItems.map((item, itemIdx) => {
                       const itemKey = `${interestCategory}-${itemIdx}`;
@@ -359,7 +352,6 @@ export default function MainDashboard({ navigation }: any) {
                           <Text style={styles.itemTitle}>{item.title}</Text>
                           <Text style={styles.itemSummary}>{item.summary}</Text>
 
-                          {/* Footer Link & Copy Actions */}
                           <View style={styles.itemFooterRow}>
                             {item.link ? (
                               <TouchableOpacity 
@@ -367,8 +359,8 @@ export default function MainDashboard({ navigation }: any) {
                                 onPress={() => AgentService.openURL(item.link!)}
                                 activeOpacity={0.7}
                               >
-                                <ExternalLink color={theme.colors.primaryLight} size={13} />
-                                <Text style={styles.linkText} numberOfLines={1}>Source Article</Text>
+                                <ExternalLink color={theme.colors.primaryLight} size={12} />
+                                <Text style={styles.linkText} numberOfLines={1}>Source Link</Text>
                               </TouchableOpacity>
                             ) : <View />}
 
@@ -391,11 +383,7 @@ export default function MainDashboard({ navigation }: any) {
                       );
                     })}
                   </View>
-                ) : (
-                  <View style={styles.emptySectionBox}>
-                    <Text style={styles.emptySectionText}>Compiling insights for this topic...</Text>
-                  </View>
-                )}
+                ) : null}
               </View>
             );
           })}
@@ -408,16 +396,16 @@ export default function MainDashboard({ navigation }: any) {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Sparkles color={theme.colors.primaryLight} size={18} />
+                <Sparkles color={theme.colors.primaryLight} size={16} />
                 <Text style={styles.modalTitle}>Import Topic Output</Text>
               </View>
               <TouchableOpacity onPress={() => setIsImportModalOpen(false)}>
-                <X color={theme.colors.text} size={20} />
+                <X color={theme.colors.text} size={18} />
               </TouchableOpacity>
             </View>
 
             <Text style={styles.modalSubtitle}>
-              Paste research output under topic: <Text style={{ color: theme.colors.secondary, fontWeight: '700' }}>{selectedImportCategory}</Text>
+              Topic: <Text style={{ color: theme.colors.secondary, fontWeight: '700' }}>{selectedImportCategory}</Text>
             </Text>
 
             <TextInput
@@ -435,7 +423,7 @@ export default function MainDashboard({ navigation }: any) {
                 <Text style={styles.modalCancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalSubmitBtn} onPress={handleImportAIResponse}>
-                <PlusCircle color="#fff" size={15} />
+                <PlusCircle color="#fff" size={14} />
                 <Text style={styles.modalSubmitBtnText}>Add Items</Text>
               </TouchableOpacity>
             </View>
@@ -447,80 +435,76 @@ export default function MainDashboard({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#090D16' },
+  container: { flex: 1, backgroundColor: '#070A10' },
   header: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
     paddingHorizontal: theme.spacing.md, 
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: 10,
     backgroundColor: '#0F172A',
     borderBottomWidth: 1,
-    borderBottomColor: '#1E293B'
+    borderBottomColor: '#1E2640'
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  appTitle: { fontSize: 18, fontWeight: '800', color: '#F8FAFC' },
-  greeting: { fontSize: 16, fontWeight: '700', color: '#F8FAFC' },
-  date: { fontSize: 11, color: theme.colors.textSecondary, marginTop: 1 },
-  headerRightActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  iconBtn: { padding: 8, backgroundColor: '#1E293B', borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
-  iconBtnDisabled: { opacity: 0.6 },
+  appTitle: { fontSize: 17, fontWeight: '800', color: '#F8FAFC' },
+  greeting: { fontSize: 15, fontWeight: '700', color: '#F8FAFC' },
+  date: { fontSize: 11, color: theme.colors.textSecondary },
+  headerRightActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  iconBtn: { padding: 7, backgroundColor: '#1E2640', borderRadius: 8 },
+  iconBtnDisabled: { opacity: 0.5 },
   welcomeScroll: { padding: theme.spacing.lg, flexGrow: 1, justifyContent: 'center' },
-  welcomeCard: { backgroundColor: '#131C2E', padding: theme.spacing.lg, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#22324D' },
-  welcomeIconContainer: { width: 64, height: 64, borderRadius: 32, backgroundColor: `${theme.colors.primary}25`, justifyContent: 'center', alignItems: 'center', marginBottom: theme.spacing.md },
-  welcomeTitle: { fontSize: 20, fontWeight: '800', color: '#F8FAFC', textAlign: 'center', marginBottom: theme.spacing.sm },
-  welcomeDescription: { fontSize: 13, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: theme.spacing.lg, lineHeight: 20 },
-  welcomeBtn: { backgroundColor: theme.colors.primary, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' },
-  welcomeBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  welcomeCard: { backgroundColor: '#0F172A', padding: theme.spacing.lg, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: '#1E2640' },
+  welcomeIconContainer: { width: 56, height: 56, borderRadius: 28, backgroundColor: `${theme.colors.primary}20`, justifyContent: 'center', alignItems: 'center', marginBottom: theme.spacing.md },
+  welcomeTitle: { fontSize: 18, fontWeight: '800', color: '#F8FAFC', textAlign: 'center', marginBottom: 4 },
+  welcomeDescription: { fontSize: 12, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: theme.spacing.lg, lineHeight: 18 },
+  welcomeBtn: { backgroundColor: theme.colors.primary, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%' },
+  welcomeBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
   scrollContent: { padding: theme.spacing.md, paddingBottom: theme.spacing.xxl },
-  statusCard: { backgroundColor: '#131C2E', padding: theme.spacing.md, borderRadius: 14, marginBottom: theme.spacing.md, borderWidth: 1, borderColor: '#22324D' },
-  statusHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  statusCard: { backgroundColor: '#0F172A', padding: theme.spacing.md, borderRadius: 12, marginBottom: theme.spacing.md, borderWidth: 1, borderColor: '#1E2640' },
+  statusHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   statusBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.colors.success },
-  statusBadgeTitle: { fontSize: 11, fontWeight: '800', color: theme.colors.primaryLight, letterSpacing: 0.5 },
-  apiActiveBadge: { backgroundColor: `${theme.colors.secondary}20`, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: `${theme.colors.secondary}40` },
+  liveDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: theme.colors.success },
+  statusBadgeTitle: { fontSize: 10, fontWeight: '800', color: theme.colors.primaryLight, letterSpacing: 0.5 },
+  apiActiveBadge: { backgroundColor: `${theme.colors.secondary}18`, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 3 },
   apiActiveText: { color: theme.colors.secondary, fontWeight: '700', fontSize: 10 },
-  localActiveBadge: { backgroundColor: '#1E293B', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#334155' },
+  localActiveBadge: { backgroundColor: '#1E2640', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 3 },
   localActiveText: { color: theme.colors.textSecondary, fontWeight: '600', fontSize: 10 },
-  agentMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 2 },
-  agentMetaPill: { backgroundColor: '#0B132B', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#1E293B' },
-  agentMetaText: { fontSize: 11, color: theme.colors.textSecondary },
-  agentMetaHighlight: { color: '#F8FAFC', fontWeight: '700' },
-  autoStatusText: { fontSize: 12, color: theme.colors.secondary, marginTop: 8, fontWeight: '600' },
+  autoStatusText: { fontSize: 11, color: theme.colors.secondary, marginTop: 6, fontWeight: '600' },
   globalActionsRow: { flexDirection: 'row', gap: 8, marginBottom: theme.spacing.md },
-  whatsappPrimaryBtn: { flex: 2, backgroundColor: theme.colors.whatsapp, paddingVertical: 10, borderRadius: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
+  whatsappPrimaryBtn: { flex: 2, backgroundColor: theme.colors.whatsapp, paddingVertical: 10, borderRadius: 8, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
   whatsappPrimaryBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  copyAllBtn: { flex: 1, backgroundColor: '#1E293B', borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: '#334155' },
+  copyAllBtn: { flex: 1, backgroundColor: '#1E2640', borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   copyAllBtnText: { color: theme.colors.text, fontSize: 12, fontWeight: '600' },
   sectionsContainer: { gap: theme.spacing.md },
-  interestSectionCard: { backgroundColor: '#131C2E', borderRadius: 14, padding: theme.spacing.md, borderWidth: 1, borderColor: '#22324D' },
-  sectionHeader: { marginBottom: theme.spacing.sm },
+  interestSectionCard: { backgroundColor: '#0F172A', borderRadius: 12, padding: theme.spacing.md, borderWidth: 1, borderColor: '#1E2640' },
+  sectionHeader: { marginBottom: 4 },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sectionNumberBadge: { width: 26, height: 26, borderRadius: 13, backgroundColor: `${theme.colors.primary}25`, justifyContent: 'center', alignItems: 'center' },
-  sectionNumberText: { color: theme.colors.primaryLight, fontWeight: '800', fontSize: 11 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#F8FAFC' },
+  sectionNumberBadge: { width: 24, height: 24, borderRadius: 12, backgroundColor: `${theme.colors.primary}20`, justifyContent: 'center', alignItems: 'center' },
+  sectionNumberText: { color: theme.colors.primaryLight, fontWeight: '800', fontSize: 10 },
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#F8FAFC' },
   sectionSubtitle: { fontSize: 11, color: theme.colors.textSecondary },
-  sectionImportBtn: { padding: 6, backgroundColor: `${theme.colors.secondary}20`, borderRadius: 6, borderWidth: 1, borderColor: `${theme.colors.secondary}40` },
-  categoryItemsList: { gap: 8 },
-  digestItem: { backgroundColor: '#0B132B', padding: theme.spacing.md, borderRadius: 10, borderWidth: 1, borderColor: '#1E293B' },
+  sectionImportBtn: { padding: 4, backgroundColor: `${theme.colors.secondary}15`, borderRadius: 6 },
+  loadingBox: { paddingVertical: theme.spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  loadingText: { fontSize: 12, color: theme.colors.textSecondary },
+  categoryItemsList: { gap: 8, marginTop: theme.spacing.sm },
+  digestItem: { backgroundColor: '#070A10', padding: theme.spacing.md, borderRadius: 8, borderWidth: 1, borderColor: '#1E2640' },
   itemTitle: { fontSize: 13, fontWeight: '700', color: '#F8FAFC', marginBottom: 4 },
   itemSummary: { fontSize: 12, color: theme.colors.textSecondary, lineHeight: 18, marginBottom: 8 },
-  itemFooterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6, borderTopWidth: 1, borderTopColor: '#1E293B' },
-  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: `${theme.colors.primary}18`, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: `${theme.colors.primary}30` },
+  itemFooterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6, borderTopWidth: 1, borderTopColor: '#1E2640' },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: `${theme.colors.primary}15`, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   linkText: { color: theme.colors.primaryLight, fontSize: 11, fontWeight: '700' },
-  itemCopyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#1E293B', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  itemCopyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#1E2640', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   itemCopyText: { fontSize: 11, color: theme.colors.textSecondary, fontWeight: '600' },
-  emptySectionBox: { backgroundColor: '#0B132B', padding: theme.spacing.md, borderRadius: 10, alignItems: 'center' },
-  emptySectionText: { fontSize: 12, color: theme.colors.textSecondary },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: theme.spacing.md },
-  modalContent: { backgroundColor: '#131C2E', borderRadius: 16, padding: theme.spacing.lg, borderWidth: 1, borderColor: '#22324D' },
+  modalContent: { backgroundColor: '#0F172A', borderRadius: 14, padding: theme.spacing.lg, borderWidth: 1, borderColor: '#1E2640' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  modalTitle: { fontSize: 15, fontWeight: '700', color: '#F8FAFC' },
-  modalSubtitle: { fontSize: 12, color: theme.colors.textSecondary, marginBottom: theme.spacing.md },
-  modalTextInput: { backgroundColor: '#0B132B', borderRadius: 10, padding: theme.spacing.md, color: theme.colors.text, fontSize: 12, height: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: '#1E293B', marginBottom: theme.spacing.md },
+  modalTitle: { fontSize: 14, fontWeight: '700', color: '#F8FAFC' },
+  modalSubtitle: { fontSize: 11, color: theme.colors.textSecondary, marginBottom: theme.spacing.md },
+  modalTextInput: { backgroundColor: '#070A10', borderRadius: 8, padding: theme.spacing.md, color: theme.colors.text, fontSize: 12, height: 90, textAlignVertical: 'top', borderWidth: 1, borderColor: '#1E2640', marginBottom: theme.spacing.md },
   modalActionButtons: { flexDirection: 'row', gap: 8 },
-  modalCancelBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: '#1E293B', alignItems: 'center' },
+  modalCancelBtn: { flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: '#1E2640', alignItems: 'center' },
   modalCancelBtnText: { color: theme.colors.textSecondary, fontWeight: '600', fontSize: 12 },
-  modalSubmitBtn: { flex: 2, paddingVertical: 10, borderRadius: 8, backgroundColor: theme.colors.primary, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
+  modalSubmitBtn: { flex: 2, paddingVertical: 8, borderRadius: 8, backgroundColor: theme.colors.primary, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
   modalSubmitBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 }
 });
